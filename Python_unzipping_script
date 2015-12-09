@@ -1,0 +1,20 @@
+import json
+import gzip
+import csv
+
+def parse(path):
+  g = gzip.open(path, 'r')
+  for l in g:
+    yield eval(l)
+
+fields = ["helpful", "reviewText", "overall","summary","reviewerID", "asin","unixReviewTime","reviewTime"]
+
+csvOut = gzip.open("reviews_Digital_Music.csv.gz", 'w')
+writer = csv.writer(csvOut)
+
+for product in parse("reviews_Digital_Music.json.gz"):
+  line = []
+  for f in fields:
+    if product.has_key(f): line.append(product[f])
+    else: line.append("")
+  writer.writerow(line)
