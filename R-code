@@ -1,0 +1,94 @@
+require("tm")
+require("SnowballC")
+require("MASS")
+
+#Loading the data and selecting a subset of the data
+
+setwd("E:/POLYMTL/MTH6312/Projet")
+read.csv("MusicReviews.csv", header=F)->Reviews
+#setting the size of the training set
+n<-60000
+ReviewsSub<-Reviews[sample(seq(1,length(Reviews[,1])),n,replace=F),]
+ReviewsSub2<-rep("0",n)
+Usef<-rep(0,n)    #Number of persons finding the review useful
+Usef2<-rep(0,n)   #Number of persons rating the usefuleness of the review
+long<-rep(0,n)    #Length of the texts
+score<-rep(0,n)   #Rating of the item reviewed
+
+for(i in 1:n)     #Creating the vector of reviews as strings
+{
+   ReviewsSub2[i]<-toString(ReviewsSub$V4[i])
+   score[i]<-ReviewsSub$V3[i]
+}
+
+for(i in 1:n)     #Extracting Usef and Usef2 from the string "[a, b]" format
+{
+  Usef[i]=toString(ReviewsSub$V1[i])
+  Usef2[i]=toString(ReviewsSub$V1[i])
+  Usef[i]=gsub("^.*([0-9]+), ([0-9]+).*$", "\\1", Usef[i])
+  Usef2[i]=gsub("^.*([0-9]+), ([0-9]+).*$", "\\2", Usef2[i])
+}
+
+ReviewsSub2<-gsub("&quot;","",ReviewsSub2)  #Removing quotation marks
+
+for(i in 1:n)     #Filling the vector of lengths of reviews
+{
+  long[i]=nchar(ReviewsSub2[i])
+}
+
+#Manipulations on the reviews
+
+doc<-VCorpus(VectorSource(ReviewsSub2))
+doc<-tm_map(doc,stripWhitespace)
+doc<-tm_map(doc,content_transformer(tolower))
+doc<-tm_map(doc,removeWords,stopwords(kind="en"))
+doc<-tm_map(doc,removePunctuation)
+doc<-tm_map(doc,stemDocument)
+dm<-DocumentTermMatrix(doc)
+
+#Data array for analysis
+#0.99 is OK for this subset. When n changes, it must be adapted.
+mat<-as.matrix(removeSparseTerms(dm,0.99))
+mat<-cbind(as.numeric(Usef),as.numeric(Usef2),long, score,mat)
+mat2<-mat[mat[,2]!=0,]    #Removing reviews with no user ratings
+
+model1<-glm(cbind(mat2[,1],mat2[,2]-mat2[,1])~.^2-V1-V2,
+           family=binomial(logit), data=as.data.frame(mat2))
+		   
+		
+		   
+		   
+		#   model1test<-glm(cbind(mat2[,1],mat2[,2]-mat2[,1])~.-V1-V2,
+         #  family=binomial(logit), data=as.data.frame(mat2))
+		 #avec ce modèle, 0.1716 d'erreur quad moyenne.
+
+
+#Plot of the predicted versus observed probabilities
+
+pred1<-fitted(model1)
+
+#discretised results 
+pred2<- pred1;
+for (i in 1:length(pred1)){
+	pred2[i] = round(pred2[i]*mat2[i,2])/mat2[i,2];
+}
+
+val1<-mat2[,1]/mat2[,2] #those are real values
+
+#calculate the MSE
+sum((pred1 - val1)^2)/length(pred1)
+sum((pred2 - val1)^2)/length(pred2)
+
+
+#plot both continuous and discretised estimated variable
+par(mfrow=c(1,2))
+plot(pred1,val1, xlab="Predicted Probability",
+     ylab="Observed proportion", main="Logit link with sparsity = 0.99", pch=20)
+plot(pred2,val1, xlab="Predicted Probability",
+     ylab="Observed proportion", main="Same graph with discretised values", pch=20)
+	 
+#building a random model for comparison	 
+
+rdm <- dunif(seq(0,1,length=38981), min = 0, max = 1)
+
+
